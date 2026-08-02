@@ -1,0 +1,252 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChronoTask — Smart Task Board</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'tasks/css/styles.css' %}">
+</head>
+<body class="dark-theme">
+    <!-- Background Glow Elements -->
+    <div class="bg-glow glow-1"></div>
+    <div class="bg-glow glow-2"></div>
+
+    <div class="app-container">
+        <!-- App Header -->
+        <header class="app-header">
+            <div class="header-brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-hourglass-half fa-spin-pulse"></i>
+                </div>
+                <div>
+                    <h1 class="brand-title">CHRONO<span class="highlight">TASK</span></h1>
+                    <p class="brand-subtitle">Smart Cybernetic Task Board & Locking Engine</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="btn-seed-demo" class="btn btn-glass" title="Populate Sample Tasks">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Load Demo
+                </button>
+                <button id="btn-open-create-modal" class="btn btn-primary">
+                    <i class="fa-solid fa-plus"></i> New Task
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Overview Cards -->
+        <section class="stats-grid">
+            <div class="stat-card" id="stat-total">
+                <div class="stat-icon"><i class="fa-solid fa-list-check"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="val-total">0</span>
+                    <span class="stat-label">Total Tasks</span>
+                </div>
+            </div>
+            <div class="stat-card" id="stat-active">
+                <div class="stat-icon"><i class="fa-solid fa-bolt"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="val-active">0</span>
+                    <span class="stat-label">Active Tasks</span>
+                </div>
+            </div>
+            <div class="stat-card" id="stat-locked">
+                <div class="stat-icon locked-glow"><i class="fa-solid fa-lock"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="val-locked">0</span>
+                    <span class="stat-label">Locked Tasks</span>
+                </div>
+            </div>
+            <div class="stat-card" id="stat-est-time">
+                <div class="stat-icon"><i class="fa-solid fa-clock"></i></div>
+                <div class="stat-info">
+                    <span class="stat-value" id="val-est-time">0h 0m</span>
+                    <span class="stat-label">Total Estimated Time</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Control Bar: Search & Filters -->
+        <section class="control-bar">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="search-input" placeholder="Search tasks by title or description...">
+            </div>
+            <div class="filter-group">
+                <div class="tabs-status">
+                    <button class="tab-btn active" data-filter="ALL">All</button>
+                    <button class="tab-btn" data-filter="PENDING">Active</button>
+                    <button class="tab-btn" data-filter="LOCKED">Locked <i class="fa-solid fa-lock text-accent"></i></button>
+                    <button class="tab-btn" data-filter="COMPLETED">Completed <i class="fa-solid fa-check-double text-success"></i></button>
+                </div>
+                <div class="select-wrapper">
+                    <select id="priority-filter" class="custom-select">
+                        <option value="ALL">All Priorities</option>
+                        <option value="URGENT">🔴 Urgent</option>
+                        <option value="HIGH">🟠 High</option>
+                        <option value="MEDIUM">🟡 Medium</option>
+                        <option value="LOW">🔵 Low</option>
+                    </select>
+                </div>
+                <div class="select-wrapper">
+                    <select id="sort-select" class="custom-select">
+                        <option value="NEWEST">Newest First</option>
+                        <option value="PRIORITY">Priority (High to Low)</option>
+                        <option value="ESTIMATED">Estimated Time</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Task Board Grid -->
+        <main class="board-section">
+            <div id="task-grid" class="task-grid">
+                <!-- Task Cards will be rendered dynamically -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="empty-state hidden">
+                <div class="empty-icon">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
+                <h3>No Tasks Found</h3>
+                <p>Create a task or click "Load Demo" to populate example tasks with lock mechanisms!</p>
+                <button class="btn btn-primary" onclick="document.getElementById('btn-open-create-modal').click()">
+                    <i class="fa-solid fa-plus"></i> Create First Task
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create Task Modal -->
+    <div id="create-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-square-plus text-primary"></i> Create Smart Task</h2>
+                <button class="close-modal" id="btn-close-create">&times;</button>
+            </div>
+            <form id="create-task-form">
+                <div class="form-group">
+                    <label for="task-title">Task Title <span class="required">*</span></label>
+                    <input type="text" id="task-title" required placeholder="e.g. Deploy Suborbital Quantum Server">
+                </div>
+
+                <div class="form-group">
+                    <label for="task-desc">Description / Notes</label>
+                    <textarea id="task-desc" rows="3" placeholder="Provide detailed task directives..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-6">
+                        <label for="task-priority">Priority Level</label>
+                        <select id="task-priority" class="custom-select">
+                            <option value="LOW">🔵 Low</option>
+                            <option value="MEDIUM" selected>🟡 Medium</option>
+                            <option value="HIGH">🟠 High</option>
+                            <option value="URGENT">🔴 Urgent</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group col-6">
+                        <label for="task-est">Est. Time (Minutes)</label>
+                        <input type="number" id="task-est" value="30" min="5" max="600" step="5">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="task-lock-type">Lock Mechanism</label>
+                    <select id="task-lock-type" class="custom-select">
+                        <option value="NONE">🔓 No Lock (Immediate Completion)</option>
+                        <option value="COUNTDOWN">⏱️ Time Countdown Lock</option>
+                        <option value="CODE">🔐 Secret Passcode Lock</option>
+                    </select>
+                </div>
+
+                <!-- Conditional Fields -->
+                <div id="lock-countdown-fields" class="form-group hidden lock-option-box">
+                    <label for="task-countdown">Countdown Duration (Minutes)</label>
+                    <input type="number" id="task-countdown" value="3" min="1" max="1440">
+                    <small class="help-text">Task will be locked from completion until timer expires.</small>
+                </div>
+
+                <div id="lock-code-fields" class="form-group hidden lock-option-box">
+                    <label for="task-code">Secret Passcode</label>
+                    <input type="text" id="task-code" placeholder="e.g. CYBER2026">
+                    <small class="help-text">Completion requires typing this secret passphrase.</small>
+                </div>
+
+                <div class="form-group">
+                    <div class="label-with-action">
+                        <label for="task-hint">Cryptic Lock Hint</label>
+                        <button type="button" id="btn-random-hint" class="btn-text">
+                            <i class="fa-solid fa-wand-magic"></i> Auto-Generate
+                        </button>
+                    </div>
+                    <textarea id="task-hint" rows="2" placeholder="e.g. Patience is a key written in shadow..."></textarea>
+                    <small class="help-text">Revealed in a mysterious prompt if completion fails while locked.</small>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-create">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Create Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cryptic Hint Failure Modal -->
+    <div id="cryptic-modal" class="modal-overlay hidden">
+        <div class="modal-card cryptic-card">
+            <div class="cryptic-header">
+                <div class="cryptic-icon-wrapper">
+                    <i class="fa-solid fa-lock-keyhole fa-beat-fade"></i>
+                </div>
+                <h3>COMPLETION DENIED</h3>
+                <span class="cryptic-subtitle">TASK SEAL INTACT</span>
+            </div>
+
+            <div class="cryptic-body">
+                <div class="terminal-box">
+                    <div class="terminal-header">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                        <span class="terminal-title">CHRONO_HINT_ENGINE.LOG</span>
+                    </div>
+                    <div class="terminal-content">
+                        <p id="cryptic-text" class="typing-text"></p>
+                    </div>
+                </div>
+
+                <div id="cryptic-countdown-box" class="cryptic-timer hidden">
+                    <i class="fa-solid fa-hourglass-start"></i>
+                    <span>Remaining Seal Time: <strong id="cryptic-timer-val">00:00</strong></span>
+                </div>
+
+                <div id="cryptic-passcode-box" class="cryptic-passcode-form hidden">
+                    <p class="passcode-prompt"><i class="fa-solid fa-key"></i> Passcode Required to Break Seal:</p>
+                    <div class="passcode-input-row">
+                        <input type="text" id="passcode-attempt-input" placeholder="Enter secret code..." autocomplete="off">
+                        <button id="btn-submit-passcode" class="btn btn-accent"><i class="fa-solid fa-unlock"></i> Unlock</button>
+                    </div>
+                    <p id="passcode-error" class="error-msg hidden">Incorrect passcode provided!</p>
+                </div>
+            </div>
+
+            <div class="modal-footer justify-center">
+                <button id="btn-close-cryptic" class="btn btn-glass">Acknowledge Fate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JS -->
+    <script src="{% static 'tasks/js/app.js' %}"></script>
+</body>
+</html>
