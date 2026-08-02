@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Smart Task Board{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Dashboard</h1>
+    <p>Overview of your task board</p>
+  </div>
+</div>
+
+<div class="stats-grid" id="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon total">📋</div>
+    <div class="stat-label">Total Tasks</div>
+    <div class="stat-value" id="stat-total">{{ stats.total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon pending">⏳</div>
+    <div class="stat-label">Pending</div>
+    <div class="stat-value" id="stat-pending">{{ stats.pending }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon completed">✓</div>
+    <div class="stat-label">Completed</div>
+    <div class="stat-value" id="stat-completed">{{ stats.completed }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon locked">🔒</div>
+    <div class="stat-label">Locked</div>
+    <div class="stat-value" id="stat-locked">{{ stats.locked }}</div>
+  </div>
+</div>
+
+<div class="card" style="padding: 20px;">
+  <p style="color: var(--text-secondary); font-size: 13.5px;">
+    Navigate to <a href="{% url 'tasks' %}" style="color: var(--blue); text-decoration: none; font-weight: 600;">Tasks</a> to manage your task board.
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Auto-refresh stats every 30 seconds
+  setInterval(async () => {
+    try {
+      const res = await fetch('/api/stats/');
+      const data = await res.json();
+      document.getElementById('stat-total').textContent = data.total;
+      document.getElementById('stat-pending').textContent = data.pending;
+      document.getElementById('stat-completed').textContent = data.completed;
+      document.getElementById('stat-locked').textContent = data.locked;
+    } catch (e) {}
+  }, 30000);
+</script>
+{% endblock %}

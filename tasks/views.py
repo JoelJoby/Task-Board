@@ -1,186 +1,163 @@
 import json
-from datetime import timedelta
-from django.shortcuts import render
 from django.http import JsonResponse
-from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
-from .models import Task, DEFAULT_HINTS
-import random
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 
-def index_view(request):
-    return render(request, 'tasks/index.html')
+from .services import create_task, get_tasks, complete_task, get_stats
+from .models import Task
 
-@csrf_exempt
-@require_http_methods(["GET", "POST"])
+
+# ---------------------------------------------------------------------------
+# Page views
+# ---------------------------------------------------------------------------
+
+def dashboard(request):
+    stats = get_stats()
+    return render(request, 'tasks/dashboard.html', {'stats': stats, 'active_page': 'dashboard'})
+
+
+def tasks_page(request):
+    return render(request, 'tasks/tasks.html', {'active_page': 'tasks'})
+
+
+# ---------------------------------------------------------------------------
+# API: List tasks
+# ---------------------------------------------------------------------------
+
 def api_tasks(request):
-    if request.method == "GET":
-        tasks = Task.objects.all().order_by('-created_at')
-        return JsonResponse({
-            'success': True,
-            'tasks': [task.to_dict() for task in tasks]
+    status_filter = request.GET.get('status', '')
+    priority_filter = request.GET.get('priority', '')
+    search = request.GET.get('search', '')
+
+    qs = get_tasks(
+        status_filter=status_filter or None,
+        priority_filter=priority_filter or None,
+        search=search or None,
+    )
+
+    now = timezone.now()
+    tasks_data = []
+    for task in qs:
+        effective_status = task.get_current_status()
+
+        # Persist status updates (lock expired → pending, odd-minute → expired)
+        if effective_status != task.status and task.status not in ('completed',):
+            task.status = effective_status
+            task.save(update_fields=['status'])
+
+        # Compute deadline info (odd-minute tasks only)
+        deadline = task.deadline
+        deadline_ts = deadline.isoformat() if deadline else None
+
+        # Compute lock remaining seconds
+        lock_remaining = None
+        if effective_status == 'locked' and task.locked_until:
+            diff = (task.locked_until - now).total_seconds()
+            lock_remaining = max(0, int(diff))
+
+        tasks_data.append({
+            'id': task.id,
+            'title': task.title,
+            'priority': task.priority,
+            'estimated_time': task.estimated_time,
+            'created_at': task.created_at.isoformat(),
+            'status': effective_status,
+            'locked_until': task.locked_until.isoformat() if task.locked_until else None,
+            'lock_remaining': lock_remaining,
+            'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+            'deadline': deadline_ts,
+            'is_odd_minute': task.created_at.minute % 2 != 0,
         })
-    
-    elif request.method == "POST":
-        try:
-            data = json.loads(request.body)
-            title = data.get('title', '').strip()
-            if not title:
-                return JsonResponse({'success': False, 'error': 'Task title is required.'}, status=400)
-            
-            priority = data.get('priority', 'MEDIUM')
-            if priority not in dict(Task.PRIORITY_CHOICES):
-                priority = 'MEDIUM'
-                
-            estimated_minutes = int(data.get('estimated_minutes', 30))
-            description = data.get('description', '').strip()
-            lock_type = data.get('lock_type', 'NONE')
-            if lock_type not in dict(Task.LOCK_TYPE_CHOICES):
-                lock_type = 'NONE'
-                
-            unlock_at = None
-            if lock_type == 'COUNTDOWN':
-                minutes = int(data.get('countdown_minutes', 5))
-                unlock_at = timezone.now() + timedelta(minutes=max(1, minutes))
-                
-            unlock_code = data.get('unlock_code', '').strip()
-            cryptic_hint = data.get('cryptic_hint', '').strip()
-            
-            task = Task.objects.create(
-                title=title,
-                description=description,
-                priority=priority,
-                estimated_minutes=estimated_minutes,
-                lock_type=lock_type,
-                unlock_at=unlock_at,
-                unlock_code=unlock_code,
-                cryptic_hint=cryptic_hint,
-                status='PENDING'
-            )
-            return JsonResponse({'success': True, 'task': task.to_dict()})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+    # Apply status filter after computing effective status
+    if status_filter:
+        tasks_data = [t for t in tasks_data if t['status'] == status_filter]
+
+    return JsonResponse({'tasks': tasks_data})
+
+
+# ---------------------------------------------------------------------------
+# API: Create task
+# ---------------------------------------------------------------------------
 
 @csrf_exempt
-@require_http_methods(["POST"])
+@require_http_methods(['POST'])
+def api_create_task(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'message': 'Invalid JSON.'}, status=400)
+
+    title = data.get('title', '').strip()
+    priority = data.get('priority', '').strip().lower()
+    estimated_time = data.get('estimated_time', 0)
+
+    # Validation
+    errors = {}
+    if not title:
+        errors['title'] = 'Title is required.'
+    if priority not in ('low', 'medium', 'high'):
+        errors['priority'] = 'Priority must be Low, Medium, or High.'
+    try:
+        estimated_time = int(estimated_time)
+        if estimated_time <= 0:
+            errors['estimated_time'] = 'Estimated time must be greater than 0.'
+    except (ValueError, TypeError):
+        errors['estimated_time'] = 'Estimated time must be a number.'
+
+    if errors:
+        return JsonResponse({'success': False, 'errors': errors}, status=400)
+
+    task = create_task(title=title, priority=priority, estimated_time=estimated_time)
+
+    now = timezone.now()
+    deadline = task.deadline
+    lock_remaining = None
+    if task.status == 'locked' and task.locked_until:
+        diff = (task.locked_until - now).total_seconds()
+        lock_remaining = max(0, int(diff))
+
+    return JsonResponse({
+        'success': True,
+        'message': 'Task created successfully.',
+        'task': {
+            'id': task.id,
+            'title': task.title,
+            'priority': task.priority,
+            'estimated_time': task.estimated_time,
+            'created_at': task.created_at.isoformat(),
+            'status': task.status,
+            'locked_until': task.locked_until.isoformat() if task.locked_until else None,
+            'lock_remaining': lock_remaining,
+            'deadline': deadline.isoformat() if deadline else None,
+            'is_odd_minute': task.created_at.minute % 2 != 0,
+        },
+    }, status=201)
+
+
+# ---------------------------------------------------------------------------
+# API: Complete task
+# ---------------------------------------------------------------------------
+
+@csrf_exempt
+@require_http_methods(['POST'])
 def api_complete_task(request, task_id):
-    try:
-        task = Task.objects.get(id=task_id)
-    except Task.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Task not found.'}, status=404)
-    
-    if task.status == 'COMPLETED':
-        return JsonResponse({'success': True, 'task': task.to_dict()})
+    success, message, hint = complete_task(task_id)
+    response_data = {
+        'success': success,
+        'message': message,
+    }
+    if hint:
+        response_data['hint'] = hint
+    status_code = 200 if success else 400
+    return JsonResponse(response_data, status=status_code)
 
-    try:
-        data = json.loads(request.body) if request.body else {}
-    except Exception:
-        data = {}
 
-    passcode = data.get('passcode', '').strip()
+# ---------------------------------------------------------------------------
+# API: Stats
+# ---------------------------------------------------------------------------
 
-    # Check lock status
-    if task.lock_type == 'COUNTDOWN' and task.unlock_at and timezone.now() < task.unlock_at:
-        return JsonResponse({
-            'success': False,
-            'reason': 'locked_time',
-            'cryptic_hint': task.cryptic_hint or random.choice(DEFAULT_HINTS),
-            'remaining_seconds': task.remaining_seconds
-        }, status=400)
-    
-    if task.lock_type == 'CODE':
-        if not passcode or passcode.lower() != task.unlock_code.lower():
-            return JsonResponse({
-                'success': False,
-                'reason': 'locked_code',
-                'cryptic_hint': task.cryptic_hint or random.choice(DEFAULT_HINTS),
-                'requires_passcode': True
-            }, status=400)
-
-    # Success - mark completed
-    task.status = 'COMPLETED'
-    task.completed_at = timezone.now()
-    task.save()
-
-    return JsonResponse({'success': True, 'task': task.to_dict()})
-
-@csrf_exempt
-@require_http_methods(["POST", "DELETE"])
-def api_delete_task(request, task_id):
-    try:
-        task = Task.objects.get(id=task_id)
-        task.delete()
-        return JsonResponse({'success': True})
-    except Task.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Task not found.'}, status=404)
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def api_seed_demo(request):
-    # Optionally clear existing or seed sample tasks
-    demo_tasks = [
-        {
-            "title": "Quantum Encryption Upgrade",
-            "description": "Deploy key rotation protocols across all subterranean servers.",
-            "priority": "URGENT",
-            "estimated_minutes": 45,
-            "lock_type": "NONE",
-            "cryptic_hint": "The quantum field stabilizes with immediate execution."
-        },
-        {
-            "title": "Decrypt Chronos Protocol Logs",
-            "description": "Extract temporal anomalies from Sector 7 databanks.",
-            "priority": "HIGH",
-            "estimated_minutes": 60,
-            "lock_type": "COUNTDOWN",
-            "countdown_minutes": 3,
-            "cryptic_hint": "Patience is a key written in shadow. The clock must speak '00:00' before the seal dissolves."
-        },
-        {
-            "title": "Bypass Neural Firewall Cipher",
-            "description": "Bypass security grid using the matrix security passphrase.",
-            "priority": "HIGH",
-            "estimated_minutes": 90,
-            "lock_type": "CODE",
-            "unlock_code": "CYBER2026",
-            "cryptic_hint": "A secret phrase rests in the void. Speak the lost word 'CYBER2026' to shatter the seal."
-        },
-        {
-            "title": "Sync Sub-Orbital Telemetry",
-            "description": "Align satellite antenna grid with deep space beacon.",
-            "priority": "MEDIUM",
-            "estimated_minutes": 20,
-            "lock_type": "NONE",
-            "cryptic_hint": "Telemetry sync complete."
-        },
-        {
-            "title": "Calibrate Void Engine Cores",
-            "description": "Perform safety sweep on anti-matter containment thrusters.",
-            "priority": "LOW",
-            "estimated_minutes": 15,
-            "lock_type": "COUNTDOWN",
-            "countdown_minutes": 10,
-            "cryptic_hint": "The ancient hourglass still drips with sand. Do not rush destiny."
-        }
-    ]
-
-    created = []
-    for dt in demo_tasks:
-        unlock_at = None
-        if dt.get('lock_type') == 'COUNTDOWN':
-            unlock_at = timezone.now() + timedelta(minutes=dt.get('countdown_minutes', 5))
-        
-        t = Task.objects.create(
-            title=dt['title'],
-            description=dt['description'],
-            priority=dt['priority'],
-            estimated_minutes=dt['estimated_minutes'],
-            lock_type=dt['lock_type'],
-            unlock_at=unlock_at,
-            unlock_code=dt.get('unlock_code', ''),
-            cryptic_hint=dt['cryptic_hint'],
-            status='PENDING'
-        )
-        created.append(t.to_dict())
-
-    return JsonResponse({'success': True, 'tasks': created})
+def api_stats(request):
+    return JsonResponse(get_stats())
