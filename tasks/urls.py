@@ -2,6 +2,10 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Auth
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+
     # Pages
     path('', views.dashboard, name='dashboard'),
     path('tasks/', views.tasks_page, name='tasks'),

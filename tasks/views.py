@@ -1,8 +1,10 @@
 import json
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 
 from .services import create_task, get_tasks, complete_task, get_stats
@@ -10,9 +12,42 @@ from .models import Task, Profile
 
 
 # ---------------------------------------------------------------------------
-# Page views
+# Auth views
 # ---------------------------------------------------------------------------
 
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    error = None
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+
+        if not username or not password:
+            error = 'Please enter both username and password.'
+        else:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                next_url = request.GET.get('next', '/')
+                return redirect(next_url)
+            else:
+                error = 'Invalid username or password.'
+
+    return render(request, 'tasks/login.html', {'error': error})
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('login')
+
+
+# ---------------------------------------------------------------------------
+# Page views  (all protected)
+# ---------------------------------------------------------------------------
+
+@login_required
 def dashboard(request):
     stats = get_stats()
     profile = Profile.get_profile()
@@ -23,6 +58,7 @@ def dashboard(request):
     })
 
 
+@login_required
 def tasks_page(request):
     profile = Profile.get_profile()
     return render(request, 'tasks/tasks.html', {
@@ -35,6 +71,7 @@ def tasks_page(request):
 # API: List tasks
 # ---------------------------------------------------------------------------
 
+@login_required
 def api_tasks(request):
     status_filter = request.GET.get('status', '')
     priority_filter = request.GET.get('priority', '')
@@ -92,6 +129,7 @@ def api_tasks(request):
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
+@login_required
 @require_http_methods(['POST'])
 def api_create_task(request):
     try:
@@ -151,6 +189,7 @@ def api_create_task(request):
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
+@login_required
 @require_http_methods(['POST'])
 def api_complete_task(request, task_id):
     success, message, hint = complete_task(task_id)
@@ -168,6 +207,7 @@ def api_complete_task(request, task_id):
 # API: Stats
 # ---------------------------------------------------------------------------
 
+@login_required
 def api_stats(request):
     return JsonResponse(get_stats())
 
@@ -176,6 +216,7 @@ def api_stats(request):
 # Profile: Edit
 # ---------------------------------------------------------------------------
 
+@login_required
 def edit_profile(request):
     profile = Profile.get_profile()
     errors = {}
@@ -216,7 +257,6 @@ def edit_profile(request):
             profile.dob = dob
             profile.save()
 
-            from django.shortcuts import redirect
             return redirect('/profile/edit/?saved=1')
 
     return render(request, 'tasks/edit_profile.html', {
