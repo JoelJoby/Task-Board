@@ -1,31 +1,77 @@
 import json
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 
 from .services import create_task, get_tasks, complete_task, get_stats
-from .models import Task
+from .models import Task, Profile
 
 
 # ---------------------------------------------------------------------------
-# Page views
+# Auth views
 # ---------------------------------------------------------------------------
 
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+
+    error = None
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+
+        if not username or not password:
+            error = 'Please enter both username and password.'
+        else:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                next_url = request.GET.get('next', '/')
+                return redirect(next_url)
+            else:
+                error = 'Invalid username or password.'
+
+    return render(request, 'tasks/login.html', {'error': error})
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('login')
+
+
+# ---------------------------------------------------------------------------
+# Page views  (all protected)
+# ---------------------------------------------------------------------------
+
+@login_required
 def dashboard(request):
     stats = get_stats()
-    return render(request, 'tasks/dashboard.html', {'stats': stats, 'active_page': 'dashboard'})
+    profile = Profile.get_profile()
+    return render(request, 'tasks/dashboard.html', {
+        'stats': stats,
+        'active_page': 'dashboard',
+        'profile': profile,
+    })
 
 
+@login_required
 def tasks_page(request):
-    return render(request, 'tasks/tasks.html', {'active_page': 'tasks'})
+    profile = Profile.get_profile()
+    return render(request, 'tasks/tasks.html', {
+        'active_page': 'tasks',
+        'profile': profile,
+    })
 
 
 # ---------------------------------------------------------------------------
 # API: List tasks
 # ---------------------------------------------------------------------------
 
+@login_required
 def api_tasks(request):
     status_filter = request.GET.get('status', '')
     priority_filter = request.GET.get('priority', '')
@@ -83,6 +129,7 @@ def api_tasks(request):
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
+@login_required
 @require_http_methods(['POST'])
 def api_create_task(request):
     try:
@@ -142,6 +189,7 @@ def api_create_task(request):
 # ---------------------------------------------------------------------------
 
 @csrf_exempt
+@login_required
 @require_http_methods(['POST'])
 def api_complete_task(request, task_id):
     success, message, hint = complete_task(task_id)
@@ -159,5 +207,99 @@ def api_complete_task(request, task_id):
 # API: Stats
 # ---------------------------------------------------------------------------
 
+@login_required
 def api_stats(request):
     return JsonResponse(get_stats())
+
+
+# ---------------------------------------------------------------------------
+# Profile: Edit
+# ---------------------------------------------------------------------------
+
+@login_required
+def edit_profile(request):
+    profile = Profile.get_profile()
+    user = request.user
+    errors = {}
+
+    if request.method == 'POST':
+        # --- Profile fields ---
+        name     = request.POST.get('name', '').strip()
+        email    = request.POST.get('email', '').strip()
+        phone    = request.POST.get('phone', '').strip()
+        age_raw  = request.POST.get('age', '').strip()
+        dob_raw  = request.POST.get('dob', '').strip()
+
+        # --- Account fields ---
+        new_username = request.POST.get('username', '').strip()
+        new_password = request.POST.get('new_password', '')
+        confirm_password = request.POST.get('confirm_password', '')
+
+        # --- Validation: profile ---
+        if not name:
+            errors['name'] = 'Name is required.'
+
+        age = None
+        if age_raw:
+            try:
+                age = int(age_raw)
+                if age <= 0 or age > 120:
+                    errors['age'] = 'Enter a valid age (1–120).'
+            except ValueError:
+                errors['age'] = 'Age must be a number.'
+
+        dob = None
+        if dob_raw:
+            from datetime import date
+            try:
+                dob = date.fromisoformat(dob_raw)
+            except ValueError:
+                errors['dob'] = 'Enter a valid date.'
+
+        # --- Validation: username ---
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        if not new_username:
+            errors['username'] = 'Username is required.'
+        elif new_username != user.username:
+            if User.objects.exclude(pk=user.pk).filter(username=new_username).exists():
+                errors['username'] = 'That username is already taken.'
+
+        # --- Validation: password (optional — only if filled) ---
+        if new_password or confirm_password:
+            if len(new_password) < 6:
+                errors['new_password'] = 'Password must be at least 6 characters.'
+            elif new_password != confirm_password:
+                errors['confirm_password'] = 'Passwords do not match.'
+
+        if not errors:
+            # Save profile
+            profile.name  = name
+            profile.email = email
+            profile.phone = phone
+            profile.age   = age
+            profile.dob   = dob
+            profile.save()
+
+            # Save username
+            if new_username and new_username != user.username:
+                user.username = new_username
+                user.save(update_fields=['username'])
+
+            # Save password (only if provided)
+            if new_password:
+                user.set_password(new_password)
+                user.save(update_fields=['password'])
+                # Re-authenticate so session stays valid after password change
+                from django.contrib.auth import update_session_auth_hash
+                update_session_auth_hash(request, user)
+
+            return redirect('/profile/edit/?saved=1')
+
+    return render(request, 'tasks/edit_profile.html', {
+        'profile': profile,
+        'user': user,
+        'errors': errors,
+        'active_page': '',
+    })

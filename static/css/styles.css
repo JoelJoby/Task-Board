@@ -809,3 +809,339 @@ tbody tr:hover {
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .page-content { padding: 16px; }
 }
+
+/* ===================== USER DROPDOWN ===================== */
+.user-menu-wrapper {
+  position: relative;
+}
+
+.user-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 4px 8px 4px 4px;
+  border-radius: 8px;
+  transition: background .15s;
+  user-select: none;
+  outline: none;
+}
+
+.user-area:hover,
+.user-area:focus-visible {
+  background: #f1f5f9;
+}
+
+.user-caret {
+  color: var(--text-muted);
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+
+.user-area[aria-expanded="true"] .user-caret {
+  transform: rotate(180deg);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 230px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  z-index: 200;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity .18s, transform .18s, visibility .18s;
+}
+
+.user-dropdown.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.user-dropdown-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar-lg {
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 15px !important;
+  flex-shrink: 0;
+}
+
+.user-dropdown-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.user-dropdown-email {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  word-break: break-all;
+}
+
+.user-dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+.user-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .13s;
+  font-weight: 500;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.user-dropdown-item:first-of-type {
+  border-radius: 0 0 0 0;
+}
+
+.user-dropdown-item:last-of-type {
+  border-radius: 0 0 10px 10px;
+}
+
+.user-dropdown-item:hover {
+  background: #f8fafc;
+}
+
+.user-dropdown-item svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.user-dropdown-item-danger {
+  color: var(--red);
+}
+
+.user-dropdown-item-danger svg {
+  color: var(--red);
+}
+
+.user-dropdown-item-danger:hover {
+  background: #fff1f2;
+}
+
+/* ===================== EDIT PROFILE PAGE ===================== */
+.profile-page {
+  max-width: 580px;
+}
+
+.profile-avatar-block {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-avatar-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.profile-avatar-info .profile-avatar-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.profile-avatar-info .profile-avatar-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.profile-form-body {
+  padding: 24px;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.profile-form-grid .form-group.full {
+  grid-column: 1 / -1;
+}
+
+.profile-form-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.profile-success-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 13.5px;
+  color: #166534;
+  font-weight: 500;
+}
+
+.sidebar-logo a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ===================== LOGIN PAGE ===================== */
+.login-page {
+  min-height: 100vh;
+  width: 100%;
+  background: #f4f6f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.09);
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+}
+
+.login-card-header {
+  padding: 32px 36px 24px;
+  text-align: center;
+}
+
+.login-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  background: var(--blue);
+  border-radius: 12px;
+  color: white;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+.login-card-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.login-card-header p {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+}
+
+.login-card-body {
+  padding: 8px 36px 32px;
+}
+
+.login-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: #be123c;
+  font-weight: 500;
+}
+
+.login-submit {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.login-divider {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin: 8px 0 4px;
+}
+
+.login-card-footer {
+  padding: 16px 36px 20px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.profile-section-label {
+  padding: 14px 24px 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.pwd-toggle-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.pwd-toggle-btn:hover {
+  color: var(--text-secondary);
+}
