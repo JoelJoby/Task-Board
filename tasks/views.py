@@ -1,0 +1,163 @@
+import json
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+
+from .services import create_task, get_tasks, complete_task, get_stats
+from .models import Task
+
+
+# ---------------------------------------------------------------------------
+# Page views
+# ---------------------------------------------------------------------------
+
+def dashboard(request):
+    stats = get_stats()
+    return render(request, 'tasks/dashboard.html', {'stats': stats, 'active_page': 'dashboard'})
+
+
+def tasks_page(request):
+    return render(request, 'tasks/tasks.html', {'active_page': 'tasks'})
+
+
+# ---------------------------------------------------------------------------
+# API: List tasks
+# ---------------------------------------------------------------------------
+
+def api_tasks(request):
+    status_filter = request.GET.get('status', '')
+    priority_filter = request.GET.get('priority', '')
+    search = request.GET.get('search', '')
+
+    qs = get_tasks(
+        status_filter=status_filter or None,
+        priority_filter=priority_filter or None,
+        search=search or None,
+    )
+
+    now = timezone.now()
+    tasks_data = []
+    for task in qs:
+        effective_status = task.get_current_status()
+
+        # Persist status updates (lock expired → pending, odd-minute → expired)
+        if effective_status != task.status and task.status not in ('completed',):
+            task.status = effective_status
+            task.save(update_fields=['status'])
+
+        # Compute deadline info (odd-minute tasks only)
+        deadline = task.deadline
+        deadline_ts = deadline.isoformat() if deadline else None
+
+        # Compute lock remaining seconds
+        lock_remaining = None
+        if effective_status == 'locked' and task.locked_until:
+            diff = (task.locked_until - now).total_seconds()
+            lock_remaining = max(0, int(diff))
+
+        tasks_data.append({
+            'id': task.id,
+            'title': task.title,
+            'priority': task.priority,
+            'estimated_time': task.estimated_time,
+            'created_at': task.created_at.isoformat(),
+            'status': effective_status,
+            'locked_until': task.locked_until.isoformat() if task.locked_until else None,
+            'lock_remaining': lock_remaining,
+            'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+            'deadline': deadline_ts,
+            'is_odd_minute': task.created_at.minute % 2 != 0,
+        })
+
+    # Apply status filter after computing effective status
+    if status_filter:
+        tasks_data = [t for t in tasks_data if t['status'] == status_filter]
+
+    return JsonResponse({'tasks': tasks_data})
+
+
+# ---------------------------------------------------------------------------
+# API: Create task
+# ---------------------------------------------------------------------------
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def api_create_task(request):
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'message': 'Invalid JSON.'}, status=400)
+
+    title = data.get('title', '').strip()
+    priority = data.get('priority', '').strip().lower()
+    estimated_time = data.get('estimated_time', 0)
+
+    # Validation
+    errors = {}
+    if not title:
+        errors['title'] = 'Title is required.'
+    if priority not in ('low', 'medium', 'high'):
+        errors['priority'] = 'Priority must be Low, Medium, or High.'
+    try:
+        estimated_time = int(estimated_time)
+        if estimated_time <= 0:
+            errors['estimated_time'] = 'Estimated time must be greater than 0.'
+    except (ValueError, TypeError):
+        errors['estimated_time'] = 'Estimated time must be a number.'
+
+    if errors:
+        return JsonResponse({'success': False, 'errors': errors}, status=400)
+
+    task = create_task(title=title, priority=priority, estimated_time=estimated_time)
+
+    now = timezone.now()
+    deadline = task.deadline
+    lock_remaining = None
+    if task.status == 'locked' and task.locked_until:
+        diff = (task.locked_until - now).total_seconds()
+        lock_remaining = max(0, int(diff))
+
+    return JsonResponse({
+        'success': True,
+        'message': 'Task created successfully.',
+        'task': {
+            'id': task.id,
+            'title': task.title,
+            'priority': task.priority,
+            'estimated_time': task.estimated_time,
+            'created_at': task.created_at.isoformat(),
+            'status': task.status,
+            'locked_until': task.locked_until.isoformat() if task.locked_until else None,
+            'lock_remaining': lock_remaining,
+            'deadline': deadline.isoformat() if deadline else None,
+            'is_odd_minute': task.created_at.minute % 2 != 0,
+        },
+    }, status=201)
+
+
+# ---------------------------------------------------------------------------
+# API: Complete task
+# ---------------------------------------------------------------------------
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def api_complete_task(request, task_id):
+    success, message, hint = complete_task(task_id)
+    response_data = {
+        'success': success,
+        'message': message,
+    }
+    if hint:
+        response_data['hint'] = hint
+    status_code = 200 if success else 400
+    return JsonResponse(response_data, status=status_code)
+
+
+# ---------------------------------------------------------------------------
+# API: Stats
+# ---------------------------------------------------------------------------
+
+def api_stats(request):
+    return JsonResponse(get_stats())
