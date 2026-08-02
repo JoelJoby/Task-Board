@@ -5,6 +5,7 @@ urlpatterns = [
     # Pages
     path('', views.dashboard, name='dashboard'),
     path('tasks/', views.tasks_page, name='tasks'),
+    path('profile/edit/', views.edit_profile, name='edit_profile'),
 
     # API
     path('api/tasks/', views.api_tasks, name='api_tasks'),

@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Profile — Smart Task Board{% endblock %}
+{% block page_title %}Edit Profile{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Edit Profile</h1>
+    <p>Update your personal details</p>
+  </div>
+  <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+    </svg>
+    Back
+  </a>
+</div>
+
+{% if not errors and request.method == "POST" %}
+<!-- Success (shown via redirect, so this won't show — kept for direct GET after POST) -->
+{% endif %}
+
+<div class="profile-page">
+
+  {% if saved %}
+  <div class="profile-success-banner">
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    </svg>
+    Profile updated successfully.
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <!-- Avatar preview block -->
+    <div class="profile-avatar-block">
+      <div class="profile-avatar-circle" id="avatar-circle">{{ profile.initials }}</div>
+      <div class="profile-avatar-info">
+        <div class="profile-avatar-name" id="avatar-name">{{ profile.name }}</div>
+        <div class="profile-avatar-sub">{{ profile.email|default:"No email set" }}</div>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <form method="post" action="{% url 'edit_profile' %}">
+      {% csrf_token %}
+      <div class="profile-form-body">
+        <div class="profile-form-grid">
+
+          <!-- Full Name -->
+          <div class="form-group full">
+            <label class="form-label" for="id_name">Full Name <span style="color:var(--red)">*</span></label>
+            <input
+              type="text"
+              id="id_name"
+              name="name"
+              class="form-control {% if errors.name %}error{% endif %}"
+              value="{{ profile.name }}"
+              placeholder="Enter your full name"
+              autocomplete="name"
+              oninput="updateAvatarPreview(this.value)"
+            />
+            {% if errors.name %}
+            <div class="form-error show">{{ errors.name }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Email -->
+          <div class="form-group full">
+            <label class="form-label" for="id_email">Email Address</label>
+            <input
+              type="email"
+              id="id_email"
+              name="email"
+              class="form-control {% if errors.email %}error{% endif %}"
+              value="{{ profile.email }}"
+              placeholder="you@example.com"
+              autocomplete="email"
+            />
+            {% if errors.email %}
+            <div class="form-error show">{{ errors.email }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Phone -->
+          <div class="form-group">
+            <label class="form-label" for="id_phone">Phone Number</label>
+            <input
+              type="tel"
+              id="id_phone"
+              name="phone"
+              class="form-control {% if errors.phone %}error{% endif %}"
+              value="{{ profile.phone }}"
+              placeholder="+91 98765 43210"
+              autocomplete="tel"
+            />
+            {% if errors.phone %}
+            <div class="form-error show">{{ errors.phone }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Age -->
+          <div class="form-group">
+            <label class="form-label" for="id_age">Age</label>
+            <input
+              type="number"
+              id="id_age"
+              name="age"
+              class="form-control {% if errors.age %}error{% endif %}"
+              value="{{ profile.age|default_if_none:'' }}"
+              placeholder="e.g. 28"
+              min="1"
+              max="120"
+            />
+            {% if errors.age %}
+            <div class="form-error show">{{ errors.age }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Date of Birth -->
+          <div class="form-group full">
+            <label class="form-label" for="id_dob">Date of Birth</label>
+            <input
+              type="date"
+              id="id_dob"
+              name="dob"
+              class="form-control {% if errors.dob %}error{% endif %}"
+              value="{{ profile.dob|date:'Y-m-d'|default:'' }}"
+            />
+            {% if errors.dob %}
+            <div class="form-error show">{{ errors.dob }}</div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+
+      <div class="profile-form-footer">
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Live preview — update avatar initials as the user types their name
+  function updateAvatarPreview(val) {
+    const parts = val.trim().split(/\s+/).filter(Boolean);
+    let initials = '';
+    if (parts.length >= 2) {
+      initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    } else if (parts.length === 1) {
+      initials = parts[0].slice(0, 2).toUpperCase();
+    }
+    const circle = document.getElementById('avatar-circle');
+    const nameEl = document.getElementById('avatar-name');
+    if (circle) circle.textContent = initials || '?';
+    if (nameEl) nameEl.textContent = val.trim() || 'Your Name';
+  }
+
+  // Show success toast if just saved (URL has ?saved=1)
+  if (new URLSearchParams(location.search).get('saved') === '1') {
+    showToast('Profile updated successfully.', 'success');
+    history.replaceState(null, '', location.pathname);
+  }
+</script>
+{% endblock %}

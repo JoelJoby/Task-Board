@@ -6,7 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 
 from .services import create_task, get_tasks, complete_task, get_stats
-from .models import Task
+from .models import Task, Profile
 
 
 # ---------------------------------------------------------------------------
@@ -15,11 +15,20 @@ from .models import Task
 
 def dashboard(request):
     stats = get_stats()
-    return render(request, 'tasks/dashboard.html', {'stats': stats, 'active_page': 'dashboard'})
+    profile = Profile.get_profile()
+    return render(request, 'tasks/dashboard.html', {
+        'stats': stats,
+        'active_page': 'dashboard',
+        'profile': profile,
+    })
 
 
 def tasks_page(request):
-    return render(request, 'tasks/tasks.html', {'active_page': 'tasks'})
+    profile = Profile.get_profile()
+    return render(request, 'tasks/tasks.html', {
+        'active_page': 'tasks',
+        'profile': profile,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -161,3 +170,57 @@ def api_complete_task(request, task_id):
 
 def api_stats(request):
     return JsonResponse(get_stats())
+
+
+# ---------------------------------------------------------------------------
+# Profile: Edit
+# ---------------------------------------------------------------------------
+
+def edit_profile(request):
+    profile = Profile.get_profile()
+    errors = {}
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        email = request.POST.get('email', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        age_raw = request.POST.get('age', '').strip()
+        dob_raw = request.POST.get('dob', '').strip()
+
+        # Validation
+        if not name:
+            errors['name'] = 'Name is required.'
+
+        age = None
+        if age_raw:
+            try:
+                age = int(age_raw)
+                if age <= 0 or age > 120:
+                    errors['age'] = 'Enter a valid age (1–120).'
+            except ValueError:
+                errors['age'] = 'Age must be a number.'
+
+        dob = None
+        if dob_raw:
+            from datetime import date
+            try:
+                dob = date.fromisoformat(dob_raw)
+            except ValueError:
+                errors['dob'] = 'Enter a valid date.'
+
+        if not errors:
+            profile.name = name
+            profile.email = email
+            profile.phone = phone
+            profile.age = age
+            profile.dob = dob
+            profile.save()
+
+            from django.shortcuts import redirect
+            return redirect('/profile/edit/?saved=1')
+
+    return render(request, 'tasks/edit_profile.html', {
+        'profile': profile,
+        'errors': errors,
+        'active_page': '',
+    })

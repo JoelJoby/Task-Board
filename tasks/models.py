@@ -53,3 +53,29 @@ class Task(models.Model):
         if self.is_expired:
             return 'expired'
         return self.status
+
+
+class Profile(models.Model):
+    """Singleton profile record for the board owner."""
+    name = models.CharField(max_length=120, default='Joel D.')
+    email = models.EmailField(max_length=254, blank=True, default='')
+    phone = models.CharField(max_length=20, blank=True, default='')
+    age = models.PositiveSmallIntegerField(null=True, blank=True)
+    dob = models.DateField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Profile'
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def get_profile(cls):
+        profile, _ = cls.objects.get_or_create(pk=1)
+        return profile
+
+    def initials(self):
+        parts = self.name.strip().split()
+        if len(parts) >= 2:
+            return (parts[0][0] + parts[-1][0]).upper()
+        return self.name[:2].upper() if self.name else 'U'

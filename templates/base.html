@@ -14,7 +14,9 @@
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="logo-icon">T</div>
-      <span>TaskBoard</span>
+      <a href="{% url 'dashboard' %}">
+        <span>TaskBoard</span>
+      </a>
     </div>
     <nav class="sidebar-nav">
       <div class="sidebar-section">Menu</div>
@@ -38,16 +40,50 @@
     <header class="header">
       <div class="header-title">{% block page_title %}Dashboard{% endblock %}</div>
       <div class="header-right">
-        <button class="notif-btn" title="Notifications" id="notif-btn">
+        {% comment %} <button class="notif-btn" title="Notifications" id="notif-btn">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
           </svg>
           <span class="notif-badge"></span>
-        </button>
-        <div class="user-avatar">JD</div>
-        <div class="user-info">
-          <span class="user-name">Joel D.</span>
-          <span class="user-role">Admin</span>
+        </button> {% endcomment %}
+
+        <!-- User dropdown trigger -->
+        <div class="user-menu-wrapper" id="user-menu-wrapper">
+          <div class="user-area" id="user-area-btn" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
+            <div class="user-avatar">{{ profile.initials }}</div>
+            <div class="user-info">
+              <span class="user-name">{{ profile.name }}</span>
+              <span class="user-role">Admin</span>
+            </div>
+            <svg class="user-caret" xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+          </div>
+
+          <!-- Dropdown -->
+          <div class="user-dropdown" id="user-dropdown" role="menu">
+            <div class="user-dropdown-header">
+              <div class="user-avatar user-avatar-lg">{{ profile.initials }}</div>
+              <div>
+                <div class="user-dropdown-name">{{ profile.name }}</div>
+                <div class="user-dropdown-email">{{ profile.email|default:"No email set" }}</div>
+              </div>
+            </div>
+            <div class="user-dropdown-divider"></div>
+            <a href="{% url 'edit_profile' %}" class="user-dropdown-item" role="menuitem">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+              </svg>
+              Edit Profile
+            </a>
+            <div class="user-dropdown-divider"></div>
+            <a href="{% url 'dashboard' %}" class="user-dropdown-item user-dropdown-item-danger" role="menuitem">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+              </svg>
+              Logout
+            </a>
+          </div>
         </div>
       </div>
     </header>
@@ -81,6 +117,37 @@
         setTimeout(() => toast.remove(), 300);
       }, 4500);
     }
+
+    // User dropdown toggle
+    (function () {
+      const wrapper = document.getElementById('user-menu-wrapper');
+      const btn     = document.getElementById('user-area-btn');
+      const dropdown = document.getElementById('user-dropdown');
+      if (!btn || !dropdown) return;
+
+      function openDropdown() {
+        dropdown.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      }
+      function closeDropdown() {
+        dropdown.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.contains('open') ? closeDropdown() : openDropdown();
+      });
+
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDropdown(); }
+        if (e.key === 'Escape') closeDropdown();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!wrapper.contains(e.target)) closeDropdown();
+      });
+    })();
   </script>
 
   {% block scripts %}{% endblock %}
