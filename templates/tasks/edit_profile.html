@@ -7,7 +7,7 @@
 <div class="page-header">
   <div>
     <h1>Edit Profile</h1>
-    <p>Update your personal details</p>
+    <p>Update your personal details and account credentials</p>
   </div>
   <a href="{% url 'dashboard' %}" class="btn btn-secondary">
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -17,34 +17,24 @@
   </a>
 </div>
 
-{% if not errors and request.method == "POST" %}
-<!-- Success (shown via redirect, so this won't show — kept for direct GET after POST) -->
-{% endif %}
-
 <div class="profile-page">
 
-  {% if saved %}
-  <div class="profile-success-banner">
-    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-    </svg>
-    Profile updated successfully.
-  </div>
-  {% endif %}
+  <form method="post" action="{% url 'edit_profile' %}">
+    {% csrf_token %}
 
-  <div class="card">
-    <!-- Avatar preview block -->
-    <div class="profile-avatar-block">
-      <div class="profile-avatar-circle" id="avatar-circle">{{ profile.initials }}</div>
-      <div class="profile-avatar-info">
-        <div class="profile-avatar-name" id="avatar-name">{{ profile.name }}</div>
-        <div class="profile-avatar-sub">{{ profile.email|default:"No email set" }}</div>
+    <!-- ===== PERSONAL DETAILS CARD ===== -->
+    <div class="card" style="margin-bottom: 20px;">
+      <!-- Avatar preview -->
+      <div class="profile-avatar-block">
+        <div class="profile-avatar-circle" id="avatar-circle">{{ profile.initials }}</div>
+        <div class="profile-avatar-info">
+          <div class="profile-avatar-name" id="avatar-name">{{ profile.name }}</div>
+          <div class="profile-avatar-sub">{{ profile.email|default:"No email set" }}</div>
+        </div>
       </div>
-    </div>
 
-    <!-- Form -->
-    <form method="post" action="{% url 'edit_profile' %}">
-      {% csrf_token %}
+      <div class="profile-section-label">Personal Details</div>
+
       <div class="profile-form-body">
         <div class="profile-form-grid">
 
@@ -135,25 +125,108 @@
 
         </div>
       </div>
+    </div>
 
-      <div class="profile-form-footer">
-        <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cancel</a>
-        <button type="submit" class="btn btn-primary">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-          </svg>
-          Save Changes
-        </button>
+    <!-- ===== ACCOUNT CREDENTIALS CARD ===== -->
+    <div class="card" style="margin-bottom: 20px;">
+      <div class="profile-section-label">Account Credentials</div>
+
+      <div class="profile-form-body">
+        <div class="profile-form-grid">
+
+          <!-- Username -->
+          <div class="form-group full">
+            <label class="form-label" for="id_username">Username <span style="color:var(--red)">*</span></label>
+            <input
+              type="text"
+              id="id_username"
+              name="username"
+              class="form-control {% if errors.username %}error{% endif %}"
+              value="{{ user.username }}"
+              placeholder="Enter username"
+              autocomplete="username"
+            />
+            {% if errors.username %}
+            <div class="form-error show">{{ errors.username }}</div>
+            {% endif %}
+          </div>
+
+          <!-- New Password -->
+          <div class="form-group">
+            <label class="form-label" for="id_new_password">
+              New Password
+              <span style="font-size:11px; font-weight:400; color:var(--text-muted);">(leave blank to keep current)</span>
+            </label>
+            <div style="position:relative;">
+              <input
+                type="password"
+                id="id_new_password"
+                name="new_password"
+                class="form-control {% if errors.new_password %}error{% endif %}"
+                placeholder="Min. 6 characters"
+                autocomplete="new-password"
+                style="padding-right: 40px;"
+              />
+              <button type="button" class="pwd-toggle-btn" data-target="id_new_password" title="Show/hide" tabindex="-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              </button>
+            </div>
+            {% if errors.new_password %}
+            <div class="form-error show">{{ errors.new_password }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="form-group">
+            <label class="form-label" for="id_confirm_password">Confirm New Password</label>
+            <div style="position:relative;">
+              <input
+                type="password"
+                id="id_confirm_password"
+                name="confirm_password"
+                class="form-control {% if errors.confirm_password %}error{% endif %}"
+                placeholder="Re-enter new password"
+                autocomplete="new-password"
+                style="padding-right: 40px;"
+              />
+              <button type="button" class="pwd-toggle-btn" data-target="id_confirm_password" title="Show/hide" tabindex="-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                </svg>
+              </button>
+            </div>
+            {% if errors.confirm_password %}
+            <div class="form-error show">{{ errors.confirm_password }}</div>
+            {% endif %}
+          </div>
+
+        </div>
       </div>
-    </form>
-  </div>
+    </div>
+
+    <!-- Footer actions -->
+    <div style="display:flex; justify-content:flex-end; gap:10px; max-width:580px;">
+      <a href="{% url 'dashboard' %}" class="btn btn-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+        </svg>
+        Save Changes
+      </button>
+    </div>
+
+  </form>
 
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Live preview — update avatar initials as the user types their name
+  // Live avatar preview
   function updateAvatarPreview(val) {
     const parts = val.trim().split(/\s+/).filter(Boolean);
     let initials = '';
@@ -168,7 +241,16 @@
     if (nameEl) nameEl.textContent = val.trim() || 'Your Name';
   }
 
-  // Show success toast if just saved (URL has ?saved=1)
+  // Password toggle buttons
+  document.querySelectorAll('.pwd-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.target);
+      if (!input) return;
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+  });
+
+  // Success toast
   if (new URLSearchParams(location.search).get('saved') === '1') {
     showToast('Profile updated successfully.', 'success');
     history.replaceState(null, '', location.pathname);

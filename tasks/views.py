@@ -219,16 +219,23 @@ def api_stats(request):
 @login_required
 def edit_profile(request):
     profile = Profile.get_profile()
+    user = request.user
     errors = {}
 
     if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
-        email = request.POST.get('email', '').strip()
-        phone = request.POST.get('phone', '').strip()
-        age_raw = request.POST.get('age', '').strip()
-        dob_raw = request.POST.get('dob', '').strip()
+        # --- Profile fields ---
+        name     = request.POST.get('name', '').strip()
+        email    = request.POST.get('email', '').strip()
+        phone    = request.POST.get('phone', '').strip()
+        age_raw  = request.POST.get('age', '').strip()
+        dob_raw  = request.POST.get('dob', '').strip()
 
-        # Validation
+        # --- Account fields ---
+        new_username = request.POST.get('username', '').strip()
+        new_password = request.POST.get('new_password', '')
+        confirm_password = request.POST.get('confirm_password', '')
+
+        # --- Validation: profile ---
         if not name:
             errors['name'] = 'Name is required.'
 
@@ -249,18 +256,50 @@ def edit_profile(request):
             except ValueError:
                 errors['dob'] = 'Enter a valid date.'
 
+        # --- Validation: username ---
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        if not new_username:
+            errors['username'] = 'Username is required.'
+        elif new_username != user.username:
+            if User.objects.exclude(pk=user.pk).filter(username=new_username).exists():
+                errors['username'] = 'That username is already taken.'
+
+        # --- Validation: password (optional — only if filled) ---
+        if new_password or confirm_password:
+            if len(new_password) < 6:
+                errors['new_password'] = 'Password must be at least 6 characters.'
+            elif new_password != confirm_password:
+                errors['confirm_password'] = 'Passwords do not match.'
+
         if not errors:
-            profile.name = name
+            # Save profile
+            profile.name  = name
             profile.email = email
             profile.phone = phone
-            profile.age = age
-            profile.dob = dob
+            profile.age   = age
+            profile.dob   = dob
             profile.save()
+
+            # Save username
+            if new_username and new_username != user.username:
+                user.username = new_username
+                user.save(update_fields=['username'])
+
+            # Save password (only if provided)
+            if new_password:
+                user.set_password(new_password)
+                user.save(update_fields=['password'])
+                # Re-authenticate so session stays valid after password change
+                from django.contrib.auth import update_session_auth_hash
+                update_session_auth_hash(request, user)
 
             return redirect('/profile/edit/?saved=1')
 
     return render(request, 'tasks/edit_profile.html', {
         'profile': profile,
+        'user': user,
         'errors': errors,
         'active_page': '',
     })
